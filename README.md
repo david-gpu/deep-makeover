@@ -2,11 +2,13 @@
 
 The purpose of this deep-learning project is to show that it's possible to automatically transform pictures of faces in useful and fun ways. The way this is done is by filtering the type of faces used as inputs to the model and the types of faces used as the desired target. The exact same architecture can be used to transform masculine faces into feminine ones, or vice versa, just by switching the source and target images used during training.
 
-Here's an example of this in action:
+Here are two examples of this in action:
 
 ![Example male to female transformation](images/example_male_to_female.jpg)
 
 ![Example female to male](images/example_female_to_male.jpg)
+
+Please note the male-to-female example is my former boss [Benj Lipchak](http://www.charitocracy.org). Used with permission.
 
 Each of these two examples were made after training a model for just two hours on one GTX 1080 GPU.
 
@@ -63,3 +65,6 @@ After you have the required software above you will also need the `Large-scale C
 
 Training with default settings: `python3 dm_main.py --run train`. The script will periodically output an example batch in PNG format onto the `train` folder, and checkpoint data will be stored in the `checkpoint` folder.
 
+# About the author
+
+[LinkedIn profile of David Garcia](https://ca.linkedin.com/in/david-garcia-70913311).
