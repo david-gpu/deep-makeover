@@ -65,6 +65,8 @@ After you have the required software above you will also need the `Large-scale C
 
 Training with default settings: `python3 dm_main.py --run train`. The script will periodically output an example batch in PNG format onto the `train` folder, and checkpoint data will be stored in the `checkpoint` folder.
 
+I recommend training the model for about 40,000 to 50,000 batches. You will need to adjust `--train_time` depending on how many batches/hour your system can train.
+
 # About the author
 
 [LinkedIn profile of David Garcia](https://ca.linkedin.com/in/david-garcia-70913311).
