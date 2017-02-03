@@ -18,8 +18,8 @@ def _save_image(train_data, feature, gene_output, batch, suffix, max_samples=Non
     
     td  = train_data
 
-    clipped  = tf.maximum(tf.minimum(gene_output, 1.0), 0.0)
-    image    = tf.concat([feature, clipped], 2)
+    clipped  = np.clip(gene_output, 0, 1)
+    image    = np.concatenate([feature, clipped], 2)
 
     image    = image[:max_samples,:,:,:]
     cols     = []
@@ -27,11 +27,10 @@ def _save_image(train_data, feature, gene_output, batch, suffix, max_samples=Non
     samples_per_col = max_samples//num_cols
     
     for c in range(num_cols):
-        col   = tf.concat([image[samples_per_col*c + i,:,:,:] for i in range(samples_per_col)], 0)
+        col   = np.concatenate([image[samples_per_col*c + i,:,:,:] for i in range(samples_per_col)], 0)
         cols.append(col)
 
-    image   = tf.concat(cols, 1)
-    image   = td.sess.run(image)
+    image   = np.concatenate(cols, 1)
 
     filename = 'batch%06d_%s.png' % (batch, suffix)
     filename = os.path.join(FLAGS.train_dir, filename)
@@ -76,6 +75,7 @@ def train_model(train_data):
     tda = td.train_model
     tde = td.test_model
 
+    dm_arch.enable_training(True)
     dm_arch.initialize_variables(td.sess)
 
     assert FLAGS.annealing_half_life     % 10 == 0
@@ -90,8 +90,6 @@ def train_model(train_data):
     batch      = 0
     done       = False
     batch      = 0
-
-    dm_arch.enable_training(True)
 
     print('\nModel training...')
     while not done:

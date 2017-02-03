@@ -15,7 +15,12 @@ _glbl_variables = {_glbl_is_training.name : _glbl_is_training}
 
 def initialize_variables(sess):
     """Run this function only once and before the model begins to train"""
+
+    # First initialize all variables
     sess.run(tf.global_variables_initializer())
+
+    # Now freeze the graph to prevent new operations from being added
+    #tf.get_default_graph().finalize()
 
 def enable_training(onoff):
     """Switches training on or off globally (all models are affected).

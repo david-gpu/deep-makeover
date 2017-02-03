@@ -7,56 +7,13 @@ import dm_utils
 
 FLAGS = tf.app.flags.FLAGS
 
-def _dense_block(model, num_units, mapsize, nlayers=6, trailing=None):
-    """Adds a dense block similar to Arxiv 1608.06993.
-    """
-
-    assert len(model.get_output().get_shape()) == 4 and "Previous layer must be 4-dimensional (batch, width, height, channels)"
-
-    if trailing is None:
-        #trailing = nlayers//2
-        trailing = 2
-
-    # Always begin with a batch norm
-    model.add_batch_norm()
-
-    # Add projection in series if needed prior to shortcut
-    if num_units != int(model.get_output().get_shape()[3]):
-        model.add_lrelu()
-        model.add_conv2d(num_units, mapsize=1)
-
-    prev_layers = []
-    
-    for _ in range(nlayers):
-        # Add skip connections
-        model.add_concat(prev_layers)
-        prev_layers.append(model.get_output())
-
-        if len(prev_layers) > trailing:
-            prev_layers = prev_layers[1:]
-            assert len(prev_layers) == trailing
-
-        # Bottleneck
-        model.add_lrelu()
-        model.add_conv2d(num_units, mapsize=1)
-
-        # Composite function
-        model.add_lrelu()
-        model.add_conv2d(num_units, mapsize=mapsize)
-
-    model.add_concat(prev_layers)
-
-    # Final bottleneck
-    model.add_batch_norm()
-    model.add_lrelu()
-    model.add_conv2d(num_units, mapsize=1)
-
-    return model
-
-
 def _residual_block(model, num_units, mapsize, nlayers=2):
     """Adds a residual block similar to Arxiv 1512.03385, Figure 3.
     """
+
+    # TBD: Try pyramidal block as per arXiv 1610.02915.
+    # Note Figure 6d (the extra BN compared to 6b seems to help as per Table 2)
+    # Also note Figure 5b.
 
     assert len(model.get_output().get_shape()) == 4 and "Previous layer must be 4-dimensional (batch, width, height, channels)"
 
