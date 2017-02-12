@@ -101,6 +101,7 @@ def _get_train_data():
 
     # Annealing temperature: starts at 1.0 and decreases exponentially over time
     annealing = tf.Variable(initial_value=1.0, trainable=False, name='annealing')
+    halve_annealing = tf.assign(annealing, 0.5*annealing)
 
     # Create and initialize training and testing models
     train_model  = dm_model.create_model(sess, source_images, target_images, annealing, verbose=True)

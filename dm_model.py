@@ -89,24 +89,25 @@ def _generator_loss(features, gene_output, disc_fake_output, annealing):
     # See also https://github.com/xudonmao/Multi-class_GAN (vgg.py::loss_l2)
 
     # I.e. did we fool the discriminator?
-    gene_adversarial_loss = tf.nn.sigmoid_cross_entropy_with_logits(logits=disc_fake_output, labels=tf.ones_like(disc_fake_output))        
+    gene_adversarial_loss = tf.nn.sigmoid_cross_entropy_with_logits(logits=disc_fake_output, labels=tf.ones_like(disc_fake_output))
     gene_adversarial_loss = tf.reduce_mean(gene_adversarial_loss, name='gene_adversarial_loss')
 
-    # I.e. does the result look like the feature?
-    # TBD: Compare only center region to account for different hairstyles and beards
-    K = 4
-    assert K == 2 or K == 4 or K == 8 or K == 16 
-    downscaled_out = dm_utils.downscale(gene_output, K)
-    downscaled_fea = dm_utils.downscale(features,    K)
+    if False:
+        # I.e. does the result look like the feature?
+        # TBD: Compare only center region to account for different hairstyles and beards
+        K = 4
+        assert K == 2 or K == 4 or K == 8 or K == 16 
+        downscaled_out = dm_utils.downscale(gene_output, K)
+        downscaled_fea = dm_utils.downscale(features,    K)
 
-    gene_pixel_loss = tf.reduce_mean(tf.abs(downscaled_out - downscaled_fea), name='gene_pixel_loss')
+        gene_pixel_loss = tf.reduce_mean(tf.abs(downscaled_out - downscaled_fea), name='gene_pixel_loss')
 
-    pixel_loss_factor = FLAGS.pixel_loss_min + (FLAGS.pixel_loss_max - FLAGS.pixel_loss_min) * annealing
+        pixel_loss_factor = FLAGS.pixel_loss_min + (FLAGS.pixel_loss_max - FLAGS.pixel_loss_min) * annealing
 
-    gene_loss       = tf.add((1.0 - pixel_loss_factor) * gene_adversarial_loss,
-                                    pixel_loss_factor  * gene_pixel_loss, name='gene_loss')
+        gene_loss       = tf.add((1.0 - pixel_loss_factor) * gene_adversarial_loss,
+                                        pixel_loss_factor  * gene_pixel_loss, name='gene_loss')
 
-    return gene_loss
+    return gene_adversarial_loss # gene_loss
 
 
 def _discriminator_loss(disc_real_output, disc_fake_output):
@@ -116,8 +117,9 @@ def _discriminator_loss(disc_real_output, disc_fake_output):
 
     disc_real_loss = tf.reduce_mean(disc_real_loss, name='disc_real_loss')
     disc_fake_loss = tf.reduce_mean(disc_fake_loss, name='disc_fake_loss')
+    disc_loss      = tf.add(disc_real_loss, disc_fake_loss, name='dics_loss')
 
-    return disc_real_loss, disc_fake_loss
+    return disc_loss, disc_real_loss, disc_fake_loss
 
 
 def create_model(sess, source_images, target_images=None, annealing=None, verbose=False):    
@@ -140,12 +142,12 @@ def create_model(sess, source_images, target_images=None, annealing=None, verbos
         print()
 
     if target_images is not None:
-        learning_rate = tf.maximum(FLAGS.learning_rate_start * annealing, 1e-7, name='learning_rate')
+        learning_rate = tf.maximum(FLAGS.learning_rate_start * annealing, FLAGS.learning_rate_end, name='learning_rate')
 
         # Instance noise used to aid convergence.
         # See http://www.inference.vc/instance-noise-a-trick-for-stabilising-gan-training/
         noise_shape = [FLAGS.batch_size, rows, cols, depth]
-        noise = tf.truncated_normal(noise_shape, mean=0.0, stddev=0.2*annealing, name='instance_noise')
+        noise = tf.truncated_normal(noise_shape, mean=0.0, stddev=FLAGS.instance_noise*annealing, name='instance_noise')
         noise = tf.reshape(noise, noise_shape) # TBD: Why is this even necessary? I don't get it.
 
         #
@@ -170,8 +172,7 @@ def create_model(sess, source_images, target_images=None, annealing=None, verbos
         #
         gene_loss = _generator_loss(source_images, gene_out, disc_fake_out, annealing)
         
-        disc_real_loss, disc_fake_loss = _discriminator_loss(disc_real_out, disc_fake_out)
-        disc_loss = tf.add(disc_real_loss, disc_fake_loss, name='disc_loss')
+        disc_loss, disc_real_loss, disc_fake_loss = _discriminator_loss(disc_real_out, disc_fake_out)
 
         gene_opti = tf.train.AdamOptimizer(learning_rate=learning_rate,
                                            name='gene_optimizer')
