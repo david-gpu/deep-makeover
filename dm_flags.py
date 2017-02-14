@@ -5,7 +5,7 @@ FLAGS = tf.app.flags.FLAGS
 
 def define_flags():
     # Configuration (alphabetically)
-    tf.app.flags.DEFINE_integer('annealing_half_life', 1000,
+    tf.app.flags.DEFINE_integer('annealing_half_life', 10000,
                                 "Number of batches until annealing temperature is halved")
 
     tf.app.flags.DEFINE_string('attribute_file', 'list_attr_celeba.txt',
@@ -20,6 +20,12 @@ def define_flags():
     tf.app.flags.DEFINE_string('dataset', 'dataset',
                                "Path to the dataset directory.")
 
+    tf.app.flags.DEFINE_float('disc_loss_threshold', 0.1,
+                              "If the discriminator's loss is above this threshold then only the discriminator will train in during the next step")
+
+    tf.app.flags.DEFINE_float('disc_weights_threshold', 0.01,
+                              "Maximum absolute value allowed for weights in the discriminator")
+
     tf.app.flags.DEFINE_float('epsilon', 1e-8,
                               "Fuzz term to avoid numerical instability")
 
@@ -29,7 +35,7 @@ def define_flags():
     tf.app.flags.DEFINE_float('instance_noise', 0.5,
                               "Standard deviation (amplitude) of instance noise")
 
-    tf.app.flags.DEFINE_float('learning_rate_start', 0.000200,
+    tf.app.flags.DEFINE_float('learning_rate_start', 0.000100,
                               "Starting learning rate used for AdamOptimizer")
 
     tf.app.flags.DEFINE_float('learning_rate_end',   0.000001,

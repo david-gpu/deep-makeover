@@ -58,7 +58,7 @@ def _generator_model(sess, features):
 
     nunits = 48
     _residual_block(model, nunits, mapsize)
-    _residual_block(model, nunits, 1)
+    _residual_block(model, nunits, mapsize)
     model.add_conv2d(3, mapsize=1)
     model.add_sigmoid(1.1)
     
@@ -69,15 +69,23 @@ def _discriminator_model(sess, image):
     model = dm_arch.Model('DISC', 2 * image - 1.0)
 
     mapsize = 3
-    layers  = [32, 48, 96, 128]
+    layers  = [64, 96, 128, 192] #[32, 48, 96, 128]
 
     for nunits in layers:
-        _residual_block(model, nunits, mapsize)
+        model.add_batch_norm()
+        model.add_lrelu()
+        model.add_conv2d(nunits, mapsize=mapsize)
+            
         model.add_avg_pool()
 
     nunits = layers[-1]
-    _residual_block(model, nunits, mapsize)
-    model.add_conv2d(1, mapsize=1, stride=1)
+    model.add_batch_norm()
+    model.add_lrelu()
+    model.add_conv2d(nunits, mapsize=mapsize)
+
+    #model.add_batch_norm()
+    model.add_lrelu()
+    model.add_conv2d(1, mapsize=mapsize)
     
     model.add_mean()
 
@@ -85,41 +93,34 @@ def _discriminator_model(sess, image):
 
 
 def _generator_loss(features, gene_output, disc_fake_output, annealing):
-    # Also tried loss function from arXiv:1611.04076 but it didn't work well.
-    # See also https://github.com/xudonmao/Multi-class_GAN (vgg.py::loss_l2)
-
     # I.e. did we fool the discriminator?
-    gene_adversarial_loss = tf.nn.sigmoid_cross_entropy_with_logits(logits=disc_fake_output, labels=tf.ones_like(disc_fake_output))
-    gene_adversarial_loss = tf.reduce_mean(gene_adversarial_loss, name='gene_adversarial_loss')
-
-    if False:
-        # I.e. does the result look like the feature?
-        # TBD: Compare only center region to account for different hairstyles and beards
-        K = 4
-        assert K == 2 or K == 4 or K == 8 or K == 16 
-        downscaled_out = dm_utils.downscale(gene_output, K)
-        downscaled_fea = dm_utils.downscale(features,    K)
-
-        gene_pixel_loss = tf.reduce_mean(tf.abs(downscaled_out - downscaled_fea), name='gene_pixel_loss')
-
-        pixel_loss_factor = FLAGS.pixel_loss_min + (FLAGS.pixel_loss_max - FLAGS.pixel_loss_min) * annealing
-
-        gene_loss       = tf.add((1.0 - pixel_loss_factor) * gene_adversarial_loss,
-                                        pixel_loss_factor  * gene_pixel_loss, name='gene_loss')
+    gene_adversarial_loss = tf.reduce_mean(-disc_fake_output, name='gene_adversarial_loss')
+        
 
     return gene_adversarial_loss # gene_loss
 
 
 def _discriminator_loss(disc_real_output, disc_fake_output):
     # I.e. did we correctly identify the input as real or not?
-    disc_real_loss = tf.nn.sigmoid_cross_entropy_with_logits(logits=disc_real_output, labels=tf.ones_like(disc_real_output))
-    disc_fake_loss = tf.nn.sigmoid_cross_entropy_with_logits(logits=disc_fake_output, labels=tf.zeros_like(disc_fake_output))
+    disc_real_loss = -disc_real_output
+    disc_fake_loss =  disc_fake_output
 
     disc_real_loss = tf.reduce_mean(disc_real_loss, name='disc_real_loss')
     disc_fake_loss = tf.reduce_mean(disc_fake_loss, name='disc_fake_loss')
     disc_loss      = tf.add(disc_real_loss, disc_fake_loss, name='dics_loss')
 
     return disc_loss, disc_real_loss, disc_fake_loss
+
+
+def _clip_weights(var_list, weights_threshold):
+    """Clips all the given weights to fall within the range [-weight_threshold, weight_threshold]"""
+    ops = []
+    for var in var_list:
+        clipped = tf.clip_by_value(var, -weights_threshold, weights_threshold)
+        op      = tf.assign(var, clipped)
+        ops.append(op)
+
+    return tf.group(*ops, name='clip_weights')
 
 
 def create_model(sess, source_images, target_images=None, annealing=None, verbose=False):    
@@ -149,6 +150,7 @@ def create_model(sess, source_images, target_images=None, annealing=None, verbos
         noise_shape = [FLAGS.batch_size, rows, cols, depth]
         noise = tf.truncated_normal(noise_shape, mean=0.0, stddev=FLAGS.instance_noise*annealing, name='instance_noise')
         noise = tf.reshape(noise, noise_shape) # TBD: Why is this even necessary? I don't get it.
+        noise = 0.0
 
         #
         # Discriminator: one takes real inputs, another takes fake (generated) inputs
@@ -177,11 +179,17 @@ def create_model(sess, source_images, target_images=None, annealing=None, verbos
         gene_opti = tf.train.AdamOptimizer(learning_rate=learning_rate,
                                            name='gene_optimizer')
 
-        disc_opti = tf.train.AdamOptimizer(learning_rate=learning_rate,
-                                           name='disc_optimizer')
+        # Note WGAN doesn't work well with Adam or any other optimizer that relies on momentum
+        disc_opti = tf.train.RMSPropOptimizer(learning_rate=learning_rate, momentum=0.0,
+                                              name='disc_optimizer')
 
         gene_minimize = gene_opti.minimize(gene_loss, var_list=gene_var_list, name='gene_loss_minimize')    
         disc_minimize = disc_opti.minimize(disc_loss, var_list=disc_var_list, name='disc_loss_minimize')
+
+        # Weight clipping a la WGAN (arXiv 1701.07875)
+        # TBD: We shouldn't be clipping all variables (incl biases), just the weights
+        disc_clip_weights = _clip_weights(disc_var_list, FLAGS.disc_weights_threshold)
+        disc_minimize     = tf.group(disc_minimize, disc_clip_weights)
 
     # Package everything into an dumb object
     model = dm_utils.Container(locals())

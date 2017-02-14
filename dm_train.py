@@ -104,9 +104,19 @@ def train_model(train_data):
 
         # Tight loop to maximize GPU utilization
         # TBD: Is there any way to make Tensorflow repeat multiple times an operation with a single sess.run call?
-        gene_decor = "*"
-        for _ in range(5):
-            td.sess.run(minimize_ops)
+        if step < 200:
+            # Discriminator doing poorly --> train discriminator only
+            gene_decor = " "
+            for _ in range(10):
+                td.sess.run(tda.disc_minimize)
+        else:
+            # Discriminator doing well --> train both generator and discriminator, but mostly discriminator
+            gene_decor = "*"
+            for _ in range(2):
+                td.sess.run(minimize_ops)
+                td.sess.run(tda.disc_minimize)
+                td.sess.run(tda.disc_minimize)
+                td.sess.run(tda.disc_minimize)
         step += 1
 
         # Finished?
